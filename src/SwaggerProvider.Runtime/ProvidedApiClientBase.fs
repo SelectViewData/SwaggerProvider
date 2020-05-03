@@ -5,10 +5,11 @@ open System.Net.Http
 open System.Text.Json
 open System.Text.Json.Serialization
 
-type OpenApiException(code:int, description:string) =
+type OpenApiException(code:System.Net.HttpStatusCode, description:string, body: string) =
     inherit Exception(description)
     member __.StatusCode = code
     member __.Description = description
+    member __.Body = body
 
 type ProvidedApiClientBase(httpClient: HttpClient, options: JsonSerializerOptions) =
 
@@ -38,14 +39,14 @@ type ProvidedApiClientBase(httpClient: HttpClient, options: JsonSerializerOption
             if response.IsSuccessStatusCode
             then return response.Content
             else
-                let code = response.StatusCode |> int
+                let code = response.StatusCode
                 let codeStr = code |> string
-                errorCodes
-                |> Array.tryFindIndex((=)codeStr)
-                |> Option.iter (fun idx ->
-                    let desc = errorDescriptions.[idx]
-                    raise (OpenApiException(code, desc)))
-
-                // fail with HttpRequestException if we do not know error description
-                return response.EnsureSuccessStatusCode().Content
+                let errorDescriptionOpt =  
+                  errorCodes
+                  |> Array.tryFindIndex((=)codeStr)
+                  |> Option.map (fun idx -> errorDescriptions.[idx])
+                let! content = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                
+                raise (OpenApiException(code, (errorDescriptionOpt |> Option.defaultValue "Unknown Error Code"), content))
+                return response.Content
         }

@@ -5,7 +5,7 @@ frameworks: net5.0, netstandard2.0
 nuget FSharp.Core 4.7.0
 nuget System.Net.Http
 nuget System.Text.Json
-nuget FSharp.SystemTextJson
+nuget FSharp.SystemTextJson 
 nuget Microsoft.OpenApi.Readers prerelease
 nuget NETStandard.Library.NETFramework
 nuget Newtonsoft.Json

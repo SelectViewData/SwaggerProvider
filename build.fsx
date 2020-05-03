@@ -1,4 +1,4 @@
-#r @"paket:
+#r "paket:
 source https://nuget.org/api/v2
 framework netstandard2.0
 nuget FSharp.Core 4.7.2
@@ -33,15 +33,17 @@ open Fake.Tools.Git
 open System
 open System.IO
 
-Target.initEnvironment()
+Target.initEnvironment ()
 
 // --------------------------------------------------------------------------------------
 
 // Longer description of the project
 // (used as a description for NuGet package; line breaks are automatically cleaned up)
-let description = "F# Type Provider for Swagger & Open API"
+let description =
+    "F# Type Provider for Swagger & Open API"
 // Pattern specifying assemblies to be tested using Expecto
-let testAssemblies = "tests/**/bin/Release" </> "**" </> "*Tests*.exe"
+let testAssemblies =
+    "tests/**/bin/Release" </> "**" </> "*Tests*.exe"
 
 // Git configuration (used for publishing documentation in gh-pages branch)
 // The profile where the project is posted
@@ -52,110 +54,129 @@ let gitName = "SwaggerProvider"
 // --------------------------------------------------------------------------------------
 
 // Read additional information from the release notes document
-let release = ReleaseNotes.load "docs/RELEASE_NOTES.md"
+let release =
+    ReleaseNotes.load "docs/RELEASE_NOTES.md"
 
 // Generate assembly info files with the right version & up-to-date information
-Target.create "AssemblyInfo" (fun _ ->
-    let fileName = "src/Common/AssemblyInfo.fs"
-    AssemblyInfoFile.createFSharp fileName
-      [ AssemblyInfo.Title gitName
-        AssemblyInfo.Product gitName
-        AssemblyInfo.Description description
-        AssemblyInfo.Version release.AssemblyVersion
-        AssemblyInfo.FileVersion release.AssemblyVersion ]
-)
+Target.create
+    "AssemblyInfo"
+    (fun _ ->
+        let fileName = "src/Common/AssemblyInfo.fs"
+
+        AssemblyInfoFile.createFSharp
+            fileName
+            [ AssemblyInfo.Title gitName
+              AssemblyInfo.Product gitName
+              AssemblyInfo.Description description
+              AssemblyInfo.Version release.AssemblyVersion
+              AssemblyInfo.FileVersion release.AssemblyVersion ])
 
 // --------------------------------------------------------------------------------------
 // Clean build results
 
-Target.create "Clean" (fun _ ->
-    !! "**/**/bin/" |> Shell.cleanDirs
-    //!! "**/**/obj/" |> Shell.cleanDirs
+Target.create
+    "Clean"
+    (fun _ ->
+        !! "**/**/bin/" |> Shell.cleanDirs
+        //!! "**/**/obj/" |> Shell.cleanDirs
 
-    Shell.cleanDirs ["bin"; "temp"]
-    try File.Delete("swaggerlog") with | _ -> ()
-)
+        Shell.cleanDirs [ "bin"; "temp" ]
 
-Target.create "CleanDocs" (fun _ ->
-    Shell.cleanDirs ["docs/output"]
-)
+        try
+            File.Delete("swaggerlog")
+        with _ -> ())
+
+Target.create "CleanDocs" (fun _ -> Shell.cleanDirs [ "docs/output" ])
 
 // --------------------------------------------------------------------------------------
 // Build library & test project
 
-Target.create "Build" (fun _ ->
-    DotNet.exec id "build" "SwaggerProvider.sln -c Release" |> ignore
-)
+Target.create
+    "Build"
+    (fun _ ->
+        DotNet.exec id "build" "SwaggerProvider.sln -c Release"
+        |> ignore)
 
 let webApiInputStream = StreamRef.Empty
-Target.create "StartServer" (fun _ ->
-    Target.activateFinal "StopServer"
 
-    CreateProcess.fromRawCommandLine "dotnet" "tests/Swashbuckle.WebApi.Server/bin/Release/net5.0/Swashbuckle.WebApi.Server.dll"
-    |> CreateProcess.withStandardInput (CreatePipe webApiInputStream)
-    |> Proc.start
-    |> ignore
+Target.create
+    "StartServer"
+    (fun _ ->
+        Target.activateFinal "StopServer"
 
-    // We need delay to guarantee that server is bootstrapped
-    System.Threading.Thread.Sleep(2000)
-)
+        CreateProcess.fromRawCommandLine
+            "dotnet"
+            "tests/Swashbuckle.WebApi.Server/bin/Release/net5.0/Swashbuckle.WebApi.Server.dll"
+        |> CreateProcess.withStandardInput (CreatePipe webApiInputStream)
+        |> Proc.start
+        |> ignore
 
-Target.createFinal "StopServer" (fun _ ->
-    // Write something to input stream to stop server
-    try
-        webApiInputStream.Value.Write([|0uy|],0,1)
-    with
-    | e -> printfn "%s" e.Message
-    //Process.killAllByName "dotnet"
-)
+        // We need delay to guarantee that server is bootstrapped
+        System.Threading.Thread.Sleep(2000))
 
-Target.create "BuildTests" (fun _ ->
-    DotNet.exec id "build" "SwaggerProvider.TestsAndDocs.sln -c Release" |> ignore
-)
+Target.createFinal
+    "StopServer"
+    (fun _ ->
+        // Write something to input stream to stop server
+        try
+            webApiInputStream.Value.Write([| 0uy |], 0, 1)
+        with e -> printfn "%s" e.Message
+        //Process.killAllByName "dotnet"
+        )
+
+Target.create
+    "BuildTests"
+    (fun _ ->
+        DotNet.exec id "build" "SwaggerProvider.TestsAndDocs.sln -c Release"
+        |> ignore)
 
 // --------------------------------------------------------------------------------------
 // Run the unit tests using test runner
 
 let runTests assembly =
-    [Path.Combine(__SOURCE_DIRECTORY__, assembly)]
-    |> Testing.Expecto.run (fun p ->
-        { p with
-            WorkingDirectory = __SOURCE_DIRECTORY__
-            FailOnFocusedTests = true
-            PrintVersion = true
-            Parallel = false
-            Summary =  true
-            Debug = false
-        })
+    [ Path.Combine(__SOURCE_DIRECTORY__, assembly) ]
+    |> Testing.Expecto.run
+        (fun p ->
+            { p with
+                  WorkingDirectory = __SOURCE_DIRECTORY__
+                  FailOnFocusedTests = true
+                  PrintVersion = true
+                  Parallel = false
+                  Summary = true
+                  Debug = false })
 
-Target.create "RunUnitTests" (fun _ ->
-    runTests "tests/SwaggerProvider.Tests/bin/Release/net5.0/SwaggerProvider.Tests.dll"
-)
+Target.create
+    "RunUnitTests"
+    (fun _ -> runTests "tests/SwaggerProvider.Tests/bin/Release/net5.0/SwaggerProvider.Tests.dll")
 
-Target.create "RunIntegrationTests" (fun _ ->
-    runTests "tests/SwaggerProvider.ProviderTests/bin/Release/net5.0/SwaggerProvider.ProviderTests.dll"
-)
+Target.create
+    "RunIntegrationTests"
+    (fun _ -> runTests "tests/SwaggerProvider.ProviderTests/bin/Release/net5.0/SwaggerProvider.ProviderTests.dll")
 
 Target.create "RunTests" ignore
 
 // --------------------------------------------------------------------------------------
 // Build a NuGet package
 
-Target.create "NuGet" (fun _ ->
-    Paket.pack(fun p ->
-        { p with
-            ToolType = ToolType.CreateLocalTool()
-            OutputPath = "bin"
-            Version = release.NugetVersion
-            ReleaseNotes = String.toLines release.Notes})
-)
+Target.create
+    "NuGet"
+    (fun _ ->
+        Paket.pack
+            (fun p ->
+                { p with
+                      ToolType = ToolType.CreateLocalTool()
+                      OutputPath = "bin"
+                      Version = release.NugetVersion
+                      ReleaseNotes = String.toLines release.Notes }))
 
-Target.create "PublishNuget" (fun _ ->
-    Paket.push(fun p ->
-        { p with
-            ToolType = ToolType.CreateLocalTool()
-            WorkingDir = "bin" })
-)
+Target.create
+    "PublishNuget"
+    (fun _ ->
+        Paket.push
+            (fun p ->
+                { p with
+                      ToolType = ToolType.CreateLocalTool()
+                      WorkingDir = "bin" }))
 
 // --------------------------------------------------------------------------------------
 // Generate the documentation
@@ -182,10 +203,11 @@ Target.create "PublishNuget" (fun _ ->
 //         System.Threading.Thread.Sleep 1000
 //         exitCode
 
-Target.create "BrowseDocs" (fun _ ->
-    CreateProcess.fromRawCommandLine "dotnet" "serve -o -d ./docs"
-    |> (Proc.run >> ignore)
-)
+Target.create
+    "BrowseDocs"
+    (fun _ ->
+        CreateProcess.fromRawCommandLine "dotnet" "serve -o -d ./docs"
+        |> (Proc.run >> ignore))
 
 // Target.create "GenerateDocs" (fun _ ->
 //     let exit = Fake.executeFAKEWithOutput "docs" "docs.fsx" "" ["target", "GenerateDocs"]
@@ -208,32 +230,33 @@ Target.create "BrowseDocs" (fun _ ->
 //#load "paket-files/build/fsharp/FAKE/modules/Octokit/Octokit.fsx"
 //open Octokit
 
-Target.create "Release" (fun _ ->
-    // not fully converted from  FAKE 4
+Target.create
+    "Release"
+    (fun _ ->
+        // not fully converted from  FAKE 4
 
-    // StageAll ""
-    // Git.Commit.Commit "" (sprintf "Bump version to %s" release.NugetVersion)
-    // Branches.push ""
+        // StageAll ""
+        // Git.Commit.Commit "" (sprintf "Bump version to %s" release.NugetVersion)
+        // Branches.push ""
 
-    // Branches.tag "" release.NugetVersion
-    // Branches.pushTag "" "origin" release.NugetVersion
+        // Branches.tag "" release.NugetVersion
+        // Branches.pushTag "" "origin" release.NugetVersion
 
-    // // release on github
-    // createClient (getBuildParamOrDefault "github-user" "") (getBuildParamOrDefault "github-pw" "")
-    // |> createDraft gitOwner gitName release.NugetVersion (release.SemVer.PreRelease <> None) release.Notes
-    // // TODO: |> uploadFile "PATH_TO_FILE"
-    // |> releaseDraft
-    // |> Async.RunSynchronously
+        // // release on github
+        // createClient (getBuildParamOrDefault "github-user" "") (getBuildParamOrDefault "github-pw" "")
+        // |> createDraft gitOwner gitName release.NugetVersion (release.SemVer.PreRelease <> None) release.Notes
+        // // TODO: |> uploadFile "PATH_TO_FILE"
+        // |> releaseDraft
+        // |> Async.RunSynchronously
 
-    // using simplified FAKE 5 release for now
+        // using simplified FAKE 5 release for now
 
-    Git.Staging.stageAll ""
-    Git.Commit.exec "" (sprintf "Bump version to %s" release.NugetVersion)
-    Git.Branches.push ""
+        Git.Staging.stageAll ""
+        Git.Commit.exec "" (sprintf "Bump version to %s" release.NugetVersion)
+        Git.Branches.push ""
 
-    Git.Branches.tag "" release.NugetVersion
-    Git.Branches.pushTag "" "origin" release.NugetVersion
-)
+        Git.Branches.tag "" release.NugetVersion
+        Git.Branches.pushTag "" "origin" release.NugetVersion)
 
 Target.create "BuildPackage" ignore
 
@@ -243,23 +266,24 @@ Target.create "BuildPackage" ignore
 Target.create "All" ignore
 
 // https://github.com/fsharp/FAKE/issues/2283
-let skipTests = Environment.environVarAsBoolOrDefault "skipTests" false
+let skipTests =
+    Environment.environVarAsBoolOrDefault "skipTests" false
 
 
 "Clean"
-  ==> "AssemblyInfo"
-  ==> "Build"
-  ==> "RunUnitTests"
-  ==> "StartServer"
-  ==> "BuildTests"
-  =?> ("RunIntegrationTests", not skipTests)
-  ==> "StopServer"
-  ==> "RunTests"
-  //=?> ("GenerateDocs", BuildServer.isLocalBuild)
-  ==> "NuGet"
-  ==> "All"
-  ==> "BuildPackage"
-  ==> "PublishNuget"
-  ==> "Release"
+==> "AssemblyInfo"
+==> "Build"
+==> "RunUnitTests"
+==> "StartServer"
+==> "BuildTests"
+=?> ("RunIntegrationTests", not skipTests)
+==> "StopServer"
+==> "RunTests"
+//=?> ("GenerateDocs", BuildServer.isLocalBuild)
+==> "NuGet"
+==> "All"
+==> "BuildPackage"
+==> "PublishNuget"
+==> "Release"
 
 Target.runOrDefault "BuildPackage"

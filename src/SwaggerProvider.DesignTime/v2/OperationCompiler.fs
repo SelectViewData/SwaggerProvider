@@ -181,7 +181,14 @@ type OperationCompiler (schema:SwaggerObject, defCompiler:DefinitionCompiler, ig
                     RuntimeHelpers.fillHeaders msg %heads
                     async {
                         let! response = (%this).HttpClient.SendAsync(msg) |> Async.AwaitTask
-                        return response.EnsureSuccessStatusCode().Content
+                        if response.IsSuccessStatusCode
+                        then return response.Content
+                        else
+                            let code = response.StatusCode
+                            let! content = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                            
+                            raise (OpenApiException(code, "", content))
+                            return response.Content
                     }
                 @>
 
